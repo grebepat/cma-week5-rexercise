@@ -5,6 +5,252 @@ editor: visual
 ---
 
 
+# Installing needed packages
+
+```{r}
+
+install.packages("pacman")
+library("pacman")
+
+p_install("dplyr", force = FALSE)
+p_install("ggplot2", force = FALSE)
+p_install("readr", force = FALSE)
+p_install("tidyr", force = FALSE)
+p_install("sf", force = FALSE)
+p_install("terra", force = FALSE)
+p_install("tmap", force = FALSE)
+p_install("zoo", force = FALSE)
+p_install("units", force = FALSE)
+p_install("plotly", force = FALSE)
+p_install("patchwork", force = FALSE)
+p_install("tidyverse", force = FALSE)
+p_install("rjson", force = FALSE)
+p_install("jsonlite", force = FALSE)
+p_install("leaflet", force = TRUE)
+p_install("XML", force = TRUE)
+p_install("lubridate", force = TRUE)
+p_install("SimilarityMeasures", force = TRUE)
+p_install("plotly", force = TRUE)
+
+library("dplyr")
+library("ggplot2")
+library("tidyr")
+library("sf")
+library("terra")
+library("tmap")
+library("zoo")
+library("zoo")
+library("units")
+library("plotly")
+library("patchwork")
+library("tidyverse")
+library("rjson")
+library("jsonlite")
+library("leaflet")
+library("XML")
+library("lubridate")
+library("SimilarityMeasures")
+library("plotly")
+
+```
 
 
-Hallo welt
+# Input from week 5
+
+```{r}
+
+
+testfun <- function() {}
+
+
+testfun()
+
+class(testfun)
+
+
+
+testfun <- function(){
+  print ("this function does nothing")
+}
+
+testfun()
+
+
+
+
+testfun <- function(sometext){
+  print(sometext)
+}
+
+
+testfun(sometext = "blablabla")
+
+
+my_age <- function(birthday, output_unit){
+  difftime(Sys.time(), birthday, units = output_unit)
+  
+}
+
+my_age(birthday = "1993-04-01", output_unit = "days") / 365
+
+
+
+# with default values
+
+my_age <- function(birthday, output_unit = "days"){
+  difftime(Sys.time(), birthday, units = output_unit)
+  
+}
+
+my_age(birthday = "1993-04-01", output_unit = "secs")
+
+```
+
+# Exercise 5
+
+## Task 1: Write your own functions
+
+```{r}
+
+# Write a function to calculate a persons BMI
+
+
+bmi <- function(weight, height){
+  bmi <- weight / height^2
+  print(paste("Your BMI is", round(bmi,2)))
+  }
+
+bmi(80,1.8)
+
+# Write a function to convert degrees Celsius to Farenheit
+
+conv <- function(degrees){
+  farenheight <- degrees * (9/5) + 32
+  print(paste(degrees,"°C is" ,farenheight,"farenheight"))
+}
+
+conv(30)
+
+# Write a function which calculates the euclidian distance between two sets of coordinates
+
+euclid <- function(x1, y1, x2, y2){
+  eucl <- sqrt(((x2-x1)^2)+((y2-y2)^2))
+  print(eucl)
+}
+
+
+x1 <- 1
+y1 <- 3
+x2 <- 5
+y2 <- 1
+
+euclid(x1, y1, x2, y2)
+
+```
+
+## Task 2 Prepare analysis
+
+```{r}
+
+wildschwein <- read_delim("wildschwein_BE_2056.csv", ",")
+
+str(wildschwein)
+
+
+wildschwein <- wildschwein |> 
+  filter(,DatetimeUTC >= as.Date('2015-04-01') , DatetimeUTC <= as.Date('2015-04-15')) |> 
+  filter(, TierName == "Sabi" | TierName == "Rosa")
+
+```
+
+## Task 3: Create Join Key
+
+```{r}
+#rounding out minimal deviations
+
+wildschwein$round_date <- round_date(wildschwein$DatetimeUTC, unit = "15 mins", week_start = getOption("lubridate.week.start", "Monday"))
+
+```
+
+## Task 4: Measuring distance at concurrent locations
+
+```{r}
+
+
+# split dataset in thwo dataframes
+
+sabi <- filter(wildschwein, TierName == "Sabi")
+
+rosa <- filter(wildschwein, TierName == "Rosa")
+
+
+wildschwein_join <- inner_join(sabi, rosa, by = "round_date", suffix = c("_sabi", "_rosa"))
+
+
+# build function to calculate euclidian distance
+
+euclid <- function(x1, x2, y1, y2){
+  distance <- sqrt((x2 - x1)^2 + (y2 - y1)^2)
+  return(distance)
+}
+
+
+wildschwein_join$distance <- euclid(rosa$E, sabi$E, rosa$N, rosa$N)
+
+wildschwein_join <- wildschwein_join |> 
+  mutate(close = distance <= 100)
+
+
+```
+
+## Task 5: Visualize data
+
+```{r}
+
+# meet and greet
+
+meet <- wildschwein_join |> 
+  filter(close == TRUE)
+
+# Dann den Plot erstellen
+
+ggplot() +
+  geom_point(data = rosa, aes(x = E, y = N), color = "black", size = 1.5, alpha = 0.3) +
+  geom_point(data = sabi, aes(x = E, y = N), color = "red4", size = 1.5, alpha = 0.3) +
+  # Meets
+  geom_point(data = meet, aes(x = E_rosa, y = N_rosa, alpha = 0.75), color = "green3", size = 3) +
+  geom_point(data = meet, aes(x = E_sabi, y = N_sabi, alpha = 0.75), color = "darkgreen", size = 3) +
+  ggtitle("meet and greet") +
+  xlab("E") + ylab("N") +
+  theme_minimal() +
+  theme(
+    legend.position = "none"
+  )
+
+
+
+```
+
+## Task 6: Visualize data as timecube with plotly
+
+```{r}
+
+install.packages("plotly")
+
+library(plotly)
+
+plot_ly() |> 
+  # Rosa
+  add_trace(data = rosa, x = ~E, y = ~N, z = ~DatetimeUTC, type = 'scatter3d', mode = 'lines+markers', line = list(color = '#cea50b'), marker = list(size = 1, color = '#cea50b'), name = 'Rosa') |> 
+  # Sabi
+  add_trace(data = sabi, x = ~E, y = ~N, z = ~DatetimeUTC, type = 'scatter3d', mode = 'lines+markers', line = list(color = '#7F1425'), marker = list(size = 1, color = '#7F1425'), name = 'Sabi') |> 
+  # Meet and Greet
+  add_trace(data = meet, x = ~E_rosa, y = ~N_rosa, z = ~DatetimeUTC_sabi, type = 'scatter3d', mode = 'markers',
+            marker = list(size = 7, color = 'green', symbol = 'circle'), name = 'Hello There') |> 
+  layout(scene = list(xaxis = list(title = 'E'),
+                      yaxis = list(title = 'N'),
+                      zaxis = list(title = 'Time')))
+
+
+```
+
